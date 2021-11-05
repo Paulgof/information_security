@@ -27,33 +27,60 @@ def bytes_to_binary_view(bytes_message):
 def main(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_path=None, verbose=False):
     is_encrypt_mode = mode == ENCRYPT_MODE
     verbose_print = VerbosePrint(verbose)
+    verbose_print(f'{"Шифрование" if is_encrypt_mode else "Дешифрование"} файла {input_file}')
 
     key_var, key_base = get_key_components(key, key_path, is_encrypt_mode)
     verbose_print(
         f'Публичный ключ: ({key_var}, {key_base})' if is_encrypt_mode else f'Приватный ключ: ({key_var}, {key_base})',
     )
-    bytes_window = int(math.log2(key_base)) // 8
-    verbose_print(f'Длина блока шифрования = {bytes_window} (байт)')
-
-    crypted_blocks = []
+    bits_step = int(math.log2(key_base))
+    # bits_length = 2 ** bits_step
+    verbose_print(f'Длина блока шифрования = {bits_step} бит(а)')
     with open(input_file, 'rb') as input_file_bytes:
-        byte = input_file_bytes.read(1)
-        while byte:
-            block_integer = int.from_bytes(byte, byteorder='little')
-            verbose_print('#', byte, bin(block_integer), block_integer, end='\t----->\t', sep='\t')
-            crypted_block = (block_integer ** key_var) % key_base
-            verbose_print(
-                crypted_block.to_bytes(
-                    1,
-                    byteorder='little'
-                ),
-                bin(crypted_block),
-                crypted_block,
-                sep='\t'
-            )
-            crypted_blocks.append(crypted_block)
+        bytes_file_data = b''.join(input_file_bytes.readlines())
+        binary_view = bytes_to_binary_view(bytes_file_data)
+        verbose_print(f'b\tДвоичное представление входного файла:\n{binary_view}\n')
 
-            byte = input_file_bytes.read(1)
+    does_next_have_extra_bit = False
+    extra_flag = '1' * bits_step  # файловый флаг, что следующий блок на 1 бит больше стандартного
+    margin = 0  # количество смещений из-за экстра блоков
+    crypted_windows = []
+    verbose_print(f'{"№":<4}{"bin":^16}{"int":^16}{"cr_bin":^16}{"cr_int":^16}')
+    for window_number, window_start in enumerate(range(0, len(binary_view), bits_step), start=1):
+        extra_bit = 0
+        if not is_encrypt_mode and does_next_have_extra_bit:
+            extra_bit = 1
+
+        window = binary_view[window_start + margin:window_start + bits_step + margin + extra_bit]
+        if not is_encrypt_mode and window == extra_flag:
+            verbose_print('\tEXTRA_FLAG: пропуск блока, длина следующего будет на 1 больше стандартного.')
+            does_next_have_extra_bit = True
+            continue
+
+        if not is_encrypt_mode and does_next_have_extra_bit:
+            does_next_have_extra_bit = False
+            margin += 1
+
+        if window == '':
+            break
+
+        window_int = int(window, base=2)
+        crypted_window_int = (window_int ** key_var) % key_base
+        crypted_window = '{{:0>{}b}}'.format(bits_step).format(crypted_window_int)
+        if is_encrypt_mode and len(crypted_window) > bits_step:
+            crypted_windows.append(extra_flag)
+            verbose_print('\t+ EXTRA_FLAG for next block')
+
+        verbose_print(f'{window_number:<4}{window:^16}{window_int:^16}{crypted_window:^16}{crypted_window_int:^16}')
+        crypted_windows.append(crypted_window)
+
+    crypted_binary_view = ''.join(crypted_windows)
+    verbose_print(f'\nb\tДвоичное представление выходного файла:\n{crypted_binary_view}\n')
+    crypted_blocks = []
+    for crypted_block_start in range(0, len(crypted_binary_view), 8):
+        window = crypted_binary_view[crypted_block_start:crypted_block_start + 8]
+        window_int = int(window, base=2)
+        crypted_blocks.append(window_int.to_bytes(1, byteorder='big'))
 
     if not output_file:
         if not is_encrypt_mode and 'encrypted' in input_file:
@@ -62,7 +89,7 @@ def main(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_pat
             output_file = f'encrypted_{input_file}' if is_encrypt_mode else f'decrypted_{input_file}'
 
     with open(output_file, 'wb') as decrypted_file:
-        decrypted_file.write(b''.join(map(lambda x: x.to_bytes(bytes_window, byteorder='little'), crypted_blocks)))
+        decrypted_file.write(b''.join(crypted_blocks))
 
 
 if __name__ == '__main__':

@@ -25,7 +25,7 @@ def find_border_index(euler_value, primary_numbers):
 
 def find_d(e, euler_value):
     for d in range(2, euler_value):
-        if d * e % euler_value == 1:
+        if (d * e) % euler_value == 1:
             return d
 
     raise ValueError(f'Обратное к e={e} число d не найдено!')
