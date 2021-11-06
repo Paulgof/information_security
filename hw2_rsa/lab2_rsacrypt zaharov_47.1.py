@@ -39,10 +39,8 @@ def bytes_to_binary_view(bytes_message):
 def crypt(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_path=None, verbose=False):
     """Главный метод модуля"""
     is_encrypt_mode = mode == ENCRYPT_MODE
-    is_decrypt_mode = mode == DECRYPT_MODE
     verbose_print = VerbosePrint(verbose)
     verbose_print(f'{"Шифрование" if is_encrypt_mode else "Дешифрование"} файла {input_file}')
-    verbose_print('режим вывода процесса в консоль')
 
     key_var, key_base = get_key_components(key, key_path, is_encrypt_mode)
     verbose_print(f'{"Публичный ключ" if is_encrypt_mode else "Приватный ключ"}: ({key_var}, {key_base})')
@@ -50,54 +48,31 @@ def crypt(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_pa
     verbose_print(f'Длина блока шифрования = {bits_step} бит(а)')
     with open(input_file, 'rb') as input_file_bytes:
         bytes_file_data = b''.join(input_file_bytes.readlines())
-        if not bytes_file_data:
-            raise ValueError('No data to encrypt/decrypt')
-
         binary_view = bytes_to_binary_view(bytes_file_data)
+        verbose_print(f'b\tДвоичное представление входного файла:\n{binary_view}\n')
 
     does_next_have_extra_bit = False
     extra_flag = '1' * bits_step  # файловый флаг, что следующий блок на 1 бит больше стандартного
     margin = 0  # количество смещений из-за экстра блоков
-    previous_window = ''
     crypted_windows = []
     verbose_print(f'{"№":<4}{"bin":^16}{"int":^16}{"cr_bin":^16}{"cr_int":^16}')
     for window_number, window_start in enumerate(range(0, len(binary_view), bits_step), start=1):
         extra_bit = 0
-        if is_decrypt_mode and does_next_have_extra_bit:
+        if not is_encrypt_mode and does_next_have_extra_bit:
             extra_bit = 1
 
         window = binary_view[window_start + margin:window_start + bits_step + margin + extra_bit]
-        if window == '':  # конец файла
-            break
-
-        if all((
-                is_decrypt_mode,
-                window_start + margin >= len(binary_view) - bits_step,
-                len(window) < bits_step,
-                previous_window,
-        )):
-            verbose_print(f'{"REWRITE PREVIOUS WINDOW":^68}')
-            crypted_windows.pop()
-            previous_window_int = int(previous_window, base=2)
-            window_int = int(window, base=2)
-            true_last_window_int = previous_window_int + window_int
-            true_last_crypted_window_int = (true_last_window_int ** key_var) % key_base
-            true_last_crypted_window = '{{:0>{}b}}'.format(bits_step).format(true_last_crypted_window_int)
-            verbose_print(
-                f'{window_number-1:<4}{"":^16}{true_last_window_int:^16}{true_last_crypted_window:^16}'
-                f'{true_last_crypted_window_int:^16} '
-            )
-            crypted_windows.append(true_last_crypted_window)
-            break
-
-        if is_decrypt_mode and does_next_have_extra_bit:
-            does_next_have_extra_bit = False
-            margin += 1
-
-        if is_decrypt_mode and window == extra_flag:
+        if not is_encrypt_mode and window == extra_flag:
             verbose_print('\tEXTRA_FLAG: пропуск блока, длина следующего будет на 1 больше стандартного.')
             does_next_have_extra_bit = True
             continue
+
+        if not is_encrypt_mode and does_next_have_extra_bit:
+            does_next_have_extra_bit = False
+            margin += 1
+
+        if window == '':
+            break
 
         window_int = int(window, base=2)
         crypted_window_int = (window_int ** key_var) % key_base
@@ -107,10 +82,10 @@ def crypt(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_pa
             verbose_print('\t+ EXTRA_FLAG for next block')
 
         verbose_print(f'{window_number:<4}{window:^16}{window_int:^16}{crypted_window:^16}{crypted_window_int:^16}')
-        previous_window = window
         crypted_windows.append(crypted_window)
 
     crypted_binary_view = ''.join(crypted_windows)
+    verbose_print(f'\nb\tДвоичное представление выходного файла:\n{crypted_binary_view}\n')
     crypted_blocks = []
     for crypted_block_start in range(0, len(crypted_binary_view), 8):
         window = crypted_binary_view[crypted_block_start:crypted_block_start + 8]
@@ -118,7 +93,7 @@ def crypt(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_pa
         crypted_blocks.append(window_int.to_bytes(1, byteorder='big'))
 
     if not output_file:
-        if is_decrypt_mode and 'encrypted' in input_file:
+        if not is_encrypt_mode and 'encrypted' in input_file:
             output_file = input_file.replace('encrypted', 'decrypted')
         else:
             output_file = f'encrypted_{input_file}' if is_encrypt_mode else f'decrypted_{input_file}'

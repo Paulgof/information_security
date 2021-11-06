@@ -3,7 +3,19 @@ import random
 
 from typing import Dict, Tuple
 
-from verbose_lib import VerbosePrint
+
+class VerbosePrint:
+    """Класс для вывода сообщений в консоль в режиме verbose"""
+
+    def __init__(self, verbose=False):
+        self.verbose = verbose
+
+    def __call__(self, *args, **kwargs):
+        self.print(*args, **kwargs)
+
+    def print(self, *args, **kwargs):
+        if self.verbose:
+            print(*args, **kwargs)
 
 
 def generate_primary_numbers(n_max=100):
@@ -49,7 +61,8 @@ def main(seed=None, verbose=False) -> Dict[str, Tuple[int, int]]:
     n: int = p * q
     euler_function_value = (p - 1) * (q - 1)
     verbose_print(f'Подсчитанные значения n = {n}, Ф(n) = {euler_function_value}')
-    e_prim = primary_numbers[:find_border_index(euler_function_value, primary_numbers)]  # TODO! может быть делителем euler_function_value
+    e_prim = primary_numbers[:find_border_index(euler_function_value, primary_numbers)]
+    e_prim = list(filter(lambda x: euler_function_value % x != 0, e_prim))
     e: int = random.choice(e_prim)
     verbose_print(f'Полученное значение e = {e}')
     d: int = find_d(e, euler_function_value)
