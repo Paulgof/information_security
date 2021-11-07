@@ -76,7 +76,7 @@ def crypt(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_pa
                 len(window) < bits_step,
                 previous_window,
         )):
-            verbose_print(f'{"REWRITE PREVIOUS WINDOW":^68}')
+            verbose_print(f'{"REWRITE PREVIOUS WINDOW " + previous_window:^68}')
             crypted_windows.pop()
             previous_window_int = int(previous_window, base=2)
             window_int = int(window, base=2)
@@ -118,10 +118,11 @@ def crypt(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_pa
         crypted_blocks.append(window_int.to_bytes(1, byteorder='big'))
 
     if not output_file:
-        if is_decrypt_mode and 'encrypted' in input_file:
-            output_file = input_file.replace('encrypted', 'decrypted')
+        if is_decrypt_mode and '.enc' in input_file:
+            output_file = input_file.replace('.enc', '', 1)
+            output_file = f'{output_file[:output_file.rindex(".")]}_decrypted{output_file[output_file.rindex("."):]}'
         else:
-            output_file = f'encrypted_{input_file}' if is_encrypt_mode else f'decrypted_{input_file}'
+            output_file = f'{input_file}.enc' if is_encrypt_mode else f'{input_file}.dec'
 
     with open(output_file, 'wb') as decrypted_file:
         decrypted_file.write(b''.join(crypted_blocks))

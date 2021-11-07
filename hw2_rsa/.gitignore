@@ -1,2 +1,7 @@
 *.txt
 *.key
+~$*.docx
+*.mp3
+*.jpg
+lab/
+*.enc
