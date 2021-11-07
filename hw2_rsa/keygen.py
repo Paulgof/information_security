@@ -18,7 +18,7 @@ class VerbosePrint:
             print(*args, **kwargs)
 
 
-def generate_primary_numbers(n_max=100):
+def generate_primary_numbers(n_max=256):
     primary_numbers = []
     for number in range(2, n_max + 1):
         if not any(map(lambda x: number % x == 0, primary_numbers)):

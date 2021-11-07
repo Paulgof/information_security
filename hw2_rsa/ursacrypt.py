@@ -1,5 +1,6 @@
 import argparse
 import math
+import sys
 import time
 
 ENCRYPT_MODE = 'ENCRYPT_MODE'
@@ -37,7 +38,7 @@ def bytes_to_binary_view(bytes_message):
     return ''.join(map(lambda x: '{:0>8b}'.format(x), bytes_message))
 
 
-def crypt(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_path=None, verbose=False):
+def crypt(input_file, mode=ENCRYPT_MODE, output_file=None, key=None, key_path=None, verbose=False, progress_bar=False):
     """Главный метод модуля"""
     is_encrypt_mode = mode == ENCRYPT_MODE
     is_decrypt_mode = mode == DECRYPT_MODE
@@ -70,17 +71,21 @@ def crypt(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_pa
     last_block_skip = 0
     if is_encrypt_mode:
         last_block_length_info = len(binary_view) % origin_bits_step
+        last_block_length_info = last_block_length_info if last_block_length_info else origin_bits_step
     else:
         binary_view, last_block_length_info = binary_view[:-unified_bits_step], binary_view[-unified_bits_step:]
         last_block_length_info = int(last_block_length_info, base=2)
         last_block_skip = unified_bits_step
         verbose_print(f'Чтение длины последнего блока: {last_block_length_info} bits')
 
+    verbose_print('\nПреобразование блоков данных\n')
     if verbose:
         time.sleep(3)
 
     crypted_windows = []
-    verbose_print(f'{"№":<4}{"bin":^32}{"int":^8}{"cr_bin":^32}{"cr_int":^8}')
+    if not progress_bar:
+        verbose_print(f'{"№":<4}{"bin":^32}{"int":^8}{"cr_bin":^32}{"cr_int":^8}')
+
     for window_number, window_start in enumerate(range(0, len(binary_view) - last_block_skip, mode_step), start=1):
         window = binary_view[window_start:window_start + mode_step]
         if window == '':  # конец файла
@@ -89,7 +94,14 @@ def crypt(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_pa
         window_int = int(window, base=2)
         crypted_window_int = (window_int ** key_var) % key_base
         crypted_window = mode_template.format(crypted_window_int)
-        verbose_print(f'{window_number:<4}{window:^32}{window_int:^8}{crypted_window:^32}{crypted_window_int:^8}')
+        if progress_bar:
+            percent = window_start / len(binary_view)
+            progress_percent = f'{percent:2.2%}'
+            sys.stdout.write(f'\rProgress: {progress_percent}')
+            # sys.stdout.flush()
+        else:
+            verbose_print(f'{window_number:<4}{window:^32}{window_int:^8}{crypted_window:^32}{crypted_window_int:^8}')
+
         crypted_windows.append(crypted_window)
 
     if is_decrypt_mode:
@@ -97,8 +109,9 @@ def crypt(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_pa
         last_window_int = int(last_window, base=2)
         crypted_last_window_int = (last_window_int ** key_var) % key_base
         crypted_last_window = '{{:0>{}b}}'.format(last_block_length_info).format(crypted_last_window_int)
-        verbose_print(f'{"L":<4}{last_window:^32}{last_window_int:^8}{crypted_last_window:^32}'
-                      f'{crypted_last_window_int:^8}')
+        if not progress_bar:
+            verbose_print(f'{"L":<4}{last_window:^32}{last_window_int:^8}{crypted_last_window:^32}'
+                          f'{crypted_last_window_int:^8}')
         crypted_windows.append(crypted_last_window)
 
     crypted_binary_view = ''.join(crypted_windows)
@@ -120,7 +133,7 @@ def crypt(input_file: str, mode=ENCRYPT_MODE, output_file=None, key=None, key_pa
             output_file = f'{input_file}.enc' if is_encrypt_mode else f'{input_file}.dec'
 
     with open(output_file, 'wb') as decrypted_file:
-        verbose_print(f'Запись {"зашифрованных" if is_encrypt_mode else "дешифрованных"} данных в файл {output_file}')
+        verbose_print(f'\nЗапись {"зашифрованных" if is_encrypt_mode else "дешифрованных"} данных в файл {output_file}')
         decrypted_file.write(b''.join(crypted_blocks))
 
 
@@ -167,6 +180,11 @@ if __name__ == '__main__':
         help='Ключ (ввод в консоль двух чисел)',
     )
     command_line_parser.add_argument('-v', '--verbose', help='Вывод процесса в консоль', action='store_true')
+    command_line_parser.add_argument('-b',
+                                     '--progress_bar',
+                                     help='Вывод прогресса шифрования/дешифрования в консоль (заменяет verbose)',
+                                     action='store_true',
+                                     )
     arguments = command_line_parser.parse_args()
     crypt(
         arguments.input_file,
@@ -175,4 +193,5 @@ if __name__ == '__main__':
         key=arguments.key,
         key_path=arguments.key_path,
         verbose=arguments.verbose,
+        progress_bar=arguments.progress_bar,
     )

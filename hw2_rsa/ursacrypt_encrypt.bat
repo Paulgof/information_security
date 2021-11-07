@@ -1,1 +1,1 @@
-python ursacrypt.py %*
+python ursacrypt.py -b %*
