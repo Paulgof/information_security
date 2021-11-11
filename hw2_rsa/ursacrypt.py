@@ -80,7 +80,7 @@ def crypt(input_file, mode=ENCRYPT_MODE, output_file=None, key=None, key_path=No
 
     verbose_print('\nПреобразование блоков данных\n')
     if verbose:
-        time.sleep(3)
+        time.sleep(1.5)
 
     crypted_windows = []
     if not progress_bar:
